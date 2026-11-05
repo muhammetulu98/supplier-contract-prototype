@@ -27,7 +27,7 @@ export interface Extra {
   isFair: boolean;
   depotNo: string;
   projectCode: string;
-  bonusPeriods: { yearEnd: string; turnover: string; staff: string };
+  bonusPeriods: { turnover: string; staff: string };
 }
 
 export const newExtra = (): Extra => ({
@@ -42,7 +42,7 @@ export const newExtra = (): Extra => ({
   isFair: false,
   depotNo: "",
   projectCode: "",
-  bonusPeriods: { yearEnd: "Yearly", turnover: "Quarterly", staff: "Monthly" },
+  bonusPeriods: { turnover: "Quarterly", staff: "Monthly" },
 });
 
 export interface ProtoContract {
@@ -58,7 +58,7 @@ export interface ProtoSupplier {
   planName: string;
   contractDate: string;
   brands: { code: string; name: string; discounts: [number | null, number | null] }[];
-  products: { code: string; name: string }[];
+  productGroups: { code: string; name: string }[];
   contracts: ProtoContract[];
 }
 
@@ -70,43 +70,43 @@ const RAW: Raw[] = [
     code: "320.34.0011", title: "DİLMAN KIRTASİYE MATBAACILIK TİC. İTH. İHR. LTD. ŞTİ.", representative: "AHMET ERİŞ",
     planNo: 8, contractDate: "2021-11-24",
     brands: [{ code: "DİLMAN", name: "Dilman Kırtasiye", discounts: [10.18, 0.09] }],
-    products: [{ code: "111592", name: "Dilman Nöbet Defteri 96 Yaprak Ciltli" }, { code: "136194", name: "Dilman Fon Kartonu 9115 50*70 Karışık" }],
+    productGroups: [{ code: "DEFTER", name: "Defter" }, { code: "FON KARTONU", name: "Fon Kartonu" }],
   },
   {
     code: "320.00.001546", title: "ABKA KIRTASİYE VE AMB. SAN. TİC. A.Ş.", representative: "AHMET ERİŞ",
     planNo: 1, contractDate: "2026-05-04",
     brands: [{ code: "ABKA", name: "Abka Kırtasiye ve Ambalaj", discounts: [5, null] }],
-    products: [{ code: "241494", name: "Abka Kitap Kabı Sarı 5'Li Blisterli" }, { code: "272052", name: "Abka Proje Çantası Art College 28*38 Renkli" }],
+    productGroups: [{ code: "KITAP KABI", name: "Kitap Kabı" }, { code: "PROJE ÇANTASI", name: "Proje Çantası" }],
   },
   {
     code: "320.00.001353", title: "ÇALKAN PLASTİK SAN. VE TİC. LTD. ŞTİ.", representative: "İBRAHİM YILDIZ",
     planNo: 1, contractDate: "2026-04-07",
     brands: [{ code: "ÇALKAN", name: "Çalkan Plastik", discounts: [0.88, null] }],
-    products: [{ code: "599526", name: "Çalkan Clk-187 Minik Stand" }, { code: "599585", name: "Çalkan Clk-260 Vakumlu Çekici Araba" }],
+    productGroups: [{ code: "STAND OYUNCAK", name: "Stand Oyuncak" }, { code: "ARABA OYUNCAK", name: "Araba Oyuncak" }],
   },
   {
     code: "320.00.001622", title: "BERRA KAYA - MAKS İLETİŞİM HİZMETLERİ", representative: "MUHAMMET ÖZDEMİR",
     planNo: 1, contractDate: "2026-04-08",
     brands: [{ code: "AURiS", name: "Auris Subzero", discounts: [8.33, null] }],
-    products: [{ code: "737212", name: "Auris Mkb01 M.Media Klavye" }, { code: "737244", name: "Auris H3 Araç İçi Telefon Tutucu" }],
+    productGroups: [{ code: "KLAVYE", name: "Klavye" }, { code: "TELEFON TUTUCU", name: "Telefon Tutucu" }],
   },
   {
     code: "320.34.0430", title: "MEHTAP MUTFAK EŞYALARI A.Ş.", representative: "ALİ CEYHUN ARDUÇ",
     planNo: 8, contractDate: "2025-09-27",
     brands: [{ code: "MEHTAP", name: "Mehtap Mutfak Eşyaları", discounts: [0.09, null] }],
-    products: [{ code: "354235", name: "Mehtap Tencere 18Cm Çift Taraf Teflon Onyx" }, { code: "354236", name: "Mehtap Tencere 20Cm Çift Taraf Teflon Onyx" }],
+    productGroups: [{ code: "TENCERE", name: "Tencere" }, { code: "TAVA", name: "Tava" }],
   },
   {
     code: "320.63.18", title: "PRESTİJ İMA. OY. İTH. İHR. SAN. TİC. LTD. ŞTİ.", representative: "İBRAHİM YILDIZ",
     planNo: 1, contractDate: "2023-12-25",
     brands: [{ code: "PRESTİJ", name: "Prestij Oyuncak", discounts: [20, null] }],
-    products: [{ code: "471058", name: "Prestij Piyano Pr18 Pilli Sevimli Kutuda Tavşanlı" }, { code: "560127", name: "Prestij Fab(1504) Kartelalı Nişancı-7 Pilli Dart" }],
+    productGroups: [{ code: "PILLI OYUNCAK", name: "Pilli Oyuncak" }, { code: "KARTELALI OYUNCAK", name: "Kartelalı Oyuncak" }],
   },
   {
     code: "320.00.000088", title: "AVRASYA KIRT. VE OYUNCAK SAN. TİC. A.Ş", representative: "AHMET ERİŞ",
     planNo: 8, contractDate: "2026-01-06",
     brands: [{ code: "LETS", name: "Lets Have Fun / Avrasya Kırtasiye", discounts: [8, null] }],
-    products: [{ code: "136291", name: "Lets Parmak Boyası L-5500 6 Renk 25Mg" }, { code: "137725", name: "Lets Parmak Boyası L-5001 500Ml Beyaz" }],
+    productGroups: [{ code: "PARMAK BOYASI", name: "Parmak Boyası" }, { code: "BOYA SETI", name: "Boya Seti" }],
   },
   {
     code: "320.34.0048", title: "MAHMUTOĞLU ELEKTRONİK SAN. VE TİC. LTD. ŞTİ.", representative: "MUHAMMET ÖZDEMİR",
@@ -116,13 +116,13 @@ const RAW: Raw[] = [
       { code: "PANTHER", name: "Panther / Mahmutoğlu Elektronik", discounts: [12.5, null] },
       { code: "ALMERA", name: "Almera", discounts: [11.11, null] },
     ],
-    products: [{ code: "443673", name: "Panther Pt-z614 Usb Şarjlı Sinek Öldürücü Işık" }, { code: "383784", name: "Panther Pt-z101 Usb Şarjlı Sinek Öldürücü Raket" }],
+    productGroups: [{ code: "SINEK ÖLDÜRÜCÜ", name: "Sinek Öldürücü" }, { code: "IŞIKLI ÜRÜNLER", name: "Işıklı Ürünler" }],
   },
   {
     code: "320.00.000153", title: "SİNBO ELEK. EV ALET. PAZ. VE TİC. A. Ş.", representative: "MUHAMMET ÖZDEMİR",
     planNo: 8, contractDate: "2026-04-07",
     brands: [{ code: "SİNBO", name: "Sinbo Küçük Ev Aletleri", discounts: [4.05, 0.24] }],
-    products: [{ code: "709341", name: "Sinbo Vantilatör 16\" Sf-6789 Ayaklı 60w Beyaz" }, { code: "709346", name: "Sinbo Vantilatör 18\" Sf-6798 Ayaklı 65w Beyaz" }],
+    productGroups: [{ code: "VANTILATÖR", name: "Vantilatör" }, { code: "ISITICI", name: "Isıtıcı" }],
   },
   {
     code: "320.00.000185", title: "CEREN İTHALAT VE DAĞ. A.Ş", representative: "AHMET ERİŞ",
@@ -132,7 +132,7 @@ const RAW: Raw[] = [
       { code: "CEO", name: "Ceo Plus / Ceren Kırtasiye", discounts: [7, null] },
       { code: "CEOART", name: "Ceo Art / Ceren Kırtasiye", discounts: [7, null] },
     ],
-    products: [{ code: "573251", name: "B&d Kalem Çantası Bd-kcs090 Disco Simli Büyük Boy" }, { code: "618221", name: "Ceren Kalemkutu Bd-kcs268 B&d Tüm Modeller" }],
+    productGroups: [{ code: "KALEM ÇANTASI", name: "Kalem Çantası" }, { code: "KALEMKUTU", name: "Kalemkutu" }],
   },
 ];
 
@@ -160,7 +160,7 @@ const buildContract = (index: number, raw: Raw, kind: ScopeKind, brandIndex: num
   terms.discountGroup = DISCOUNT_GROUPS[index % DISCOUNT_GROUPS.length]!;
   terms.purchaseDue = { kind: "days", days: raw.planNo === 8 ? 180 : 0, date: null };
   terms.salesDue = { kind: "days", days: SALES_DAYS[index]!, date: null };
-  terms.freights = [{ ...newFreight("all"), delivery: index % 2 ? "transit" : "dropship", freight: index % 2 ? "excluded" : "included" }];
+  terms.freights = [{ ...newFreight("all"), delivery: index % 2 ? "warehouse" : "dropship", freight: index % 2 ? "excluded" : "included" }];
 
   const extra = newExtra();
   extra.salesListNo = "2";

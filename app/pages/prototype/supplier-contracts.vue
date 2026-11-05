@@ -86,7 +86,7 @@ const sortValue = (row: Row, key: string): string | number => {
 const searchText = (row: Row) =>
   [
     row.contract.supplierTitle, row.contract.supplierName, row.contract.supplierCode, row.contract.representativeName,
-    ...(row.contract.terms?.scopes ?? []).flatMap((scope) => [scope.brandCode, scope.brandName, scope.productCode, scope.productName]),
+    ...(row.contract.terms?.scopes ?? []).flatMap((scope) => [scope.brandCode, scope.brandName, scope.productGroupCode, scope.productGroupName]),
   ].filter(Boolean).join(" ").toLocaleLowerCase("tr");
 const visibleRows = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase("tr");
@@ -323,7 +323,7 @@ const COLUMNS = [
                 <tr v-for="scope in row.contract.terms.scopes" :key="scope.id" class="border-b border-tier-highest/40 bg-tier-low/50 text-[12px]">
                   <td class="py-1.5 pl-9 pr-3">
                     <span class="rounded bg-tier px-1.5 py-0.5">{{ scopeName(scope, row.contract.terms.scopes.length) }}</span>
-                    <span v-if="scope.kind !== 'all'" class="ml-1 text-ink-muted">· {{ scope.kind === "brand" ? "Marka" : `Ürün${scope.productName ? ` · ${scope.productName}` : ""}` }}</span>
+                    <span v-if="scope.kind !== 'all'" class="ml-1 text-ink-muted">· {{ scope.kind === "brand" ? "Marka" : `Ürün Grubu${scope.productGroupName ? ` · ${scope.productGroupName}` : ""}` }}</span>
                   </td>
                   <td />
                   <td class="px-3 py-1.5 text-ink-muted">{{ discountText(scope.discounts) }}</td>

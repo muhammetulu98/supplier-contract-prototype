@@ -5,7 +5,9 @@ import { Plus, X } from "lucide-vue-next";
 import type { Bonus } from "~/utils/supplierContractTerms";
 
 const bonus = defineModel<Bonus>({ required: true });
-defineProps<{ label: string; disabled?: boolean; idPrefix: string }>();
+const props = withDefaults(defineProps<{ label: string; disabled?: boolean; idPrefix: string; allowTiers?: boolean }>(), { allowTiers: true });
+// Koşulsuz primde (ör. sene sonu) barem olmaz; eski kayıttan gelen barem varsa düz orana çevrilir.
+if (!props.allowTiers) bonus.value.tiered = false;
 
 // Ortak ayrıştırıcı: ciro eşiği "1.000.000" yazılınca NaN değil bir milyon okunur.
 const numberOrNull = (value: string | number | null | undefined) => parseDecimal(value);
@@ -18,7 +20,7 @@ const addTier = () => {
   <div class="space-y-2">
     <div class="flex flex-wrap items-center gap-3">
       <span class="min-w-32 text-[13px] font-medium text-ink">{{ label }}</span>
-      <label class="flex items-center gap-1.5 text-[12px] text-ink-muted">
+      <label v-if="allowTiers" class="flex items-center gap-1.5 text-[12px] text-ink-muted">
         <Checkbox v-model="bonus.tiered" :disabled="disabled" :aria-label="`${label} baremli`" />
         Baremli
       </label>

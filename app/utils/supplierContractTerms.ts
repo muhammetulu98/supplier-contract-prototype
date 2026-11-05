@@ -23,15 +23,15 @@ export interface DueTerm {
   date: string | null;
 }
 
-export type ScopeKind = "all" | "brand" | "product";
+export type ScopeKind = "all" | "brand" | "productGroup";
 
 export interface TermScope {
   id: string;
   kind: ScopeKind;
   brandCode: string | null;
   brandName: string | null;
-  productCode: string | null;
-  productName: string | null;
+  productGroupCode: string | null;
+  productGroupName: string | null;
   /** Kademeli alış iskontoları, %, 4 eleman. */
   discounts: (number | null)[];
   salesDiscount: number | null;
@@ -39,8 +39,10 @@ export interface TermScope {
   turnoverBonus: Bonus;
 }
 
-export type FreightDelivery = "dropship" | "transit";
+export type FreightDelivery = "dropship" | "warehouse";
 export type FreightMode = "included" | "excluded";
+export type FreightQuantityUnit = "case" | "pallet";
+export const QUANTITY_UNIT_LABELS: Record<FreightQuantityUnit, string> = { case: "Koli", pallet: "Palet" };
 
 export interface FreightRule {
   id: string;
@@ -48,9 +50,10 @@ export interface FreightRule {
   provinces: string[];
   delivery: FreightDelivery;
   freight: FreightMode;
-  /** true: nakliye şartı yalnız sipariş tutarı ≥ minOrderAmount iken geçerli. */
+  /** true: nakliye şartı yalnız sipariş miktarı ≥ minQuantity (quantityUnit cinsinden) iken geçerli. */
   tiered: boolean;
-  minOrderAmount: number | null;
+  minQuantity: number | null;
+  quantityUnit: FreightQuantityUnit;
 }
 
 export interface SupplierContractTerms {
@@ -68,7 +71,7 @@ export interface SupplierContractTerms {
 /** Vade farkı: (alış vadesi − satış vadesi) × günlük oran (%). Prototip tahmini — teyit bekliyor. */
 export const DUE_DAILY_RATE = 0.15;
 export const DISCOUNT_GROUPS = ["A0", "A1", "A2", "B0", "B1", "C0", "C1"] as const;
-export const DELIVERY_LABELS: Record<FreightDelivery, string> = { dropship: "Yerinden", transit: "Transit" };
+export const DELIVERY_LABELS: Record<FreightDelivery, string> = { dropship: "Yerinden", warehouse: "Timon Depo" };
 export const FREIGHT_LABELS: Record<FreightMode, string> = { included: "Nakliye Dahil", excluded: "Nakliye Hariç" };
 
 let sequence = 0;
@@ -82,8 +85,8 @@ export const newScope = (kind: ScopeKind = "all"): TermScope => ({
   kind,
   brandCode: null,
   brandName: null,
-  productCode: null,
-  productName: null,
+  productGroupCode: null,
+  productGroupName: null,
   discounts: [null, null, null, null],
   salesDiscount: null,
   yearEndBonus: emptyBonus(),
@@ -97,7 +100,8 @@ export const newFreight = (kind: FreightRule["kind"] = "all"): FreightRule => ({
   delivery: "dropship",
   freight: "included",
   tiered: false,
-  minOrderAmount: null,
+  minQuantity: null,
+  quantityUnit: "case",
 });
 
 export const emptyTerms = (): SupplierContractTerms => ({
@@ -193,9 +197,9 @@ export const termsSummary = (terms: SupplierContractTerms, today: string): Terms
   };
 };
 
-/** Bir ürüne uygulanacak kapsam: ürün → marka → tümü. */
-export const resolveScope = (terms: Pick<SupplierContractTerms, "scopes">, product: { code: string; brandCode: string | null }) =>
-  terms.scopes.find((scope) => scope.kind === "product" && scope.productCode === product.code)
+/** Bir ürüne uygulanacak kapsam: ürün grubu → marka → tümü. */
+export const resolveScope = (terms: Pick<SupplierContractTerms, "scopes">, product: { groupCode: string | null; brandCode: string | null }) =>
+  (product.groupCode ? terms.scopes.find((scope) => scope.kind === "productGroup" && scope.productGroupCode === product.groupCode) : undefined)
   ?? (product.brandCode ? terms.scopes.find((scope) => scope.kind === "brand" && scope.brandCode === product.brandCode) : undefined)
   ?? terms.scopes.find((scope) => scope.kind === "all")
   ?? null;
@@ -207,16 +211,16 @@ export const resolveFreight = (terms: Pick<SupplierContractTerms, "freights">, p
   ?? null;
 
 const scopeKey = (scope: TermScope) =>
-  scope.kind === "all" ? "all" : scope.kind === "brand" ? `brand:${scope.brandCode ?? ""}` : `product:${scope.productCode ?? ""}`;
+  scope.kind === "all" ? "all" : scope.kind === "brand" ? `brand:${scope.brandCode ?? ""}` : `productGroup:${scope.productGroupCode ?? ""}`;
 
 export const scopeLabel = (scope: TermScope) =>
   scope.kind === "all" ? "Tüm ürünler"
   : scope.kind === "brand" ? scope.brandName || scope.brandCode || "Marka seçilmedi"
-  : scope.productCode || "Ürün seçilmedi";
+  : scope.productGroupName || scope.productGroupCode || "Ürün grubu seçilmedi";
 
 export const scopeIssue = (scope: TermScope, terms: Pick<SupplierContractTerms, "scopes">): string | null => {
   if (scope.kind === "brand" && !scope.brandCode) return "Marka seçilmeli";
-  if (scope.kind === "product" && !scope.productCode) return "Ürün seçilmeli";
+  if (scope.kind === "productGroup" && !scope.productGroupCode) return "Ürün grubu seçilmeli";
   if (scope.discounts.some((value) => value !== null && (value < 0 || value >= 100))) return "İskonto 0 ile 100 arasında olmalı (100 hariç)";
   if (scope.salesDiscount !== null && (scope.salesDiscount < 0 || scope.salesDiscount >= 100)) return "Satış iskontosu 0 ile 100 arasında olmalı";
   if (terms.scopes.filter((other) => scopeKey(other) === scopeKey(scope)).length > 1) return "Bu kapsam birden fazla kez girilmiş";
@@ -225,7 +229,7 @@ export const scopeIssue = (scope: TermScope, terms: Pick<SupplierContractTerms, 
 
 export const freightIssue = (rule: FreightRule): string | null => {
   if (rule.kind === "provinces" && !rule.provinces.length) return "En az bir il seçilmeli";
-  if (rule.tiered && !(rule.minOrderAmount && rule.minOrderAmount > 0)) return "Baremli nakliyede sipariş tutarı girilmeli";
+  if (rule.tiered && !(rule.minQuantity && rule.minQuantity > 0)) return "Baremli nakliyede koli/palet miktarı girilmeli";
   return null;
 };
 
@@ -274,6 +278,6 @@ export const freightLabel = (rule: FreightRule) =>
   : rule.provinces.join(", ") || "İl seçilmedi";
 
 export const freightText = (rule: FreightRule) =>
-  FREIGHT_LABELS[rule.freight] + (rule.tiered && rule.minOrderAmount
-    ? ` · ≥ ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(rule.minOrderAmount)}`
+  FREIGHT_LABELS[rule.freight] + (rule.tiered && rule.minQuantity
+    ? ` · ≥ ${new Intl.NumberFormat("tr-TR").format(rule.minQuantity)} ${QUANTITY_UNIT_LABELS[rule.quantityUnit].toLowerCase()}`
     : "");

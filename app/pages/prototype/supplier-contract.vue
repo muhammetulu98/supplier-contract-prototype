@@ -9,6 +9,7 @@ import {
   DELIVERY_LABELS,
   DISCOUNT_GROUPS,
   FREIGHT_LABELS,
+  QUANTITY_UNIT_LABELS,
   dueDays,
   emptyBonus,
   emptyTerms,
@@ -46,7 +47,7 @@ const SUPPLIERS: CodeLookupOption[] = [
   ...PROTO_UNCONTRACTED.map((item) => ({ code: item.code, name: item.title ?? item.code })),
 ];
 const BRANDS: CodeLookupOption[] = PROTO_SUPPLIERS.flatMap((item) => item.brands.map((brand) => ({ code: brand.code, name: brand.name })));
-const PRODUCTS: CodeLookupOption[] = PROTO_SUPPLIERS.flatMap((item) => item.products);
+const PRODUCT_GROUPS: CodeLookupOption[] = PROTO_SUPPLIERS.flatMap((item) => item.productGroups);
 
 const SALES_LISTS: CodeLookupOption[] = [
   { code: "1", name: "Perakende Satış" },
@@ -170,7 +171,7 @@ const makeContract = (terms: SupplierContractTerms, mode: Contract["mode"], extr
   return contract;
 };
 const scopeKey = (scope: TermScope) =>
-  scope.kind === "all" ? "all" : scope.kind === "brand" ? `brand:${scope.brandCode}` : `product:${scope.productCode}`;
+  scope.kind === "all" ? "all" : scope.kind === "brand" ? `brand:${scope.brandCode}` : `productGroup:${scope.productGroupCode}`;
 
 const contracts = ref<Contract[]>([]);
 const activeId = ref<string | null>(null);
@@ -270,19 +271,19 @@ watch([supplierCode, fairCode], () => {
 
 // ── + Kapsam ekle ─────────────────────────────────────────────────────────────────────
 const adding = ref(false);
-const addKind = ref<"brand" | "product">("brand");
+const addKind = ref<"brand" | "productGroup">("brand");
 const addBrand = ref("");
-const addProduct = ref("");
-const canAdd = computed(() => (addKind.value === "brand" ? !!addBrand.value : !!addProduct.value));
+const addProductGroup = ref("");
+const canAdd = computed(() => (addKind.value === "brand" ? !!addBrand.value : !!addProductGroup.value));
 const openAdd = () => {
   adding.value = !adding.value;
   addBrand.value = "";
-  addProduct.value = "";
+  addProductGroup.value = "";
 };
 const addContract = () => {
   if (!canAdd.value) return;
   const kind = addKind.value;
-  const key = kind === "brand" ? `brand:${addBrand.value}` : `product:${addProduct.value}`;
+  const key = kind === "brand" ? `brand:${addBrand.value}` : `productGroup:${addProductGroup.value}`;
   const duplicate = contracts.value.find((item) => scopeKey(item.terms.scopes[0]!) === key);
   if (duplicate) {
     activeId.value = duplicate.id;
@@ -296,8 +297,8 @@ const addContract = () => {
   scope.kind = kind;
   scope.brandCode = kind === "brand" ? addBrand.value : null;
   scope.brandName = kind === "brand" ? (BRANDS.find((brand) => brand.code === addBrand.value)?.name ?? null) : null;
-  scope.productCode = kind === "product" ? addProduct.value : null;
-  scope.productName = kind === "product" ? (PRODUCTS.find((product) => product.code === addProduct.value)?.name ?? null) : null;
+  scope.productGroupCode = kind === "productGroup" ? addProductGroup.value : null;
+  scope.productGroupName = kind === "productGroup" ? (PRODUCT_GROUPS.find((group) => group.code === addProductGroup.value)?.name ?? null) : null;
   const created = makeContract(next, base ? "inherit" : "new", base ? clone(base.extra) : newExtra());
   contracts.value.push(created);
   activeId.value = created.id;
@@ -310,7 +311,7 @@ const removeContract = (id: string) => {
   if (activeId.value === id) activeId.value = contracts.value[Math.max(0, index - 1)]!.id;
 };
 
-// Kapsam eklendiğinde "Tüm ürünler" artık tüm ürünler değildir: marka/ürün kapsamlarında olmayanları kapsar.
+// Kapsam eklendiğinde "Tüm ürünler" artık tüm ürünler değildir: marka/ürün grubu kapsamlarında olmayanları kapsar.
 const labelOf = (scope: TermScope) =>
   scope.kind === "all" && contracts.value.length > 1 ? "Diğer ürünler" : scopeLabel(scope);
 const profitEntries = computed(() =>
@@ -485,22 +486,22 @@ onBeforeUnmount(() => {
                 </div>
 
                 <p v-if="contracts.length > 1" class="text-[12px] text-ink-muted">
-                  <strong class="font-medium text-ink">Diğer ürünler:</strong> aşağıdaki marka ve ürün kapsamlarında olmayan tüm ürünler. Bir ürün için önce ürün, sonra marka, sonra diğer ürünler sözleşmesi geçerlidir.
+                  <strong class="font-medium text-ink">Diğer ürünler:</strong> aşağıdaki marka ve ürün grubu kapsamlarında olmayan tüm ürünler. Bir ürün için önce ürün grubu, sonra marka, sonra diğer ürünler sözleşmesi geçerlidir.
                 </p>
 
                 <div v-if="adding" class="grid items-end gap-3 rounded border border-dashed border-tier-highest p-3 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
                   <div class="space-y-1.5">
                     <Label>Kapsam tipi</Label>
-                    <Select :model-value="addKind" @update:model-value="addKind = $event as 'brand' | 'product'">
+                    <Select :model-value="addKind" @update:model-value="addKind = $event as 'brand' | 'productGroup'">
                       <SelectTrigger aria-label="Kapsam tipi"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="brand">Marka</SelectItem>
-                        <SelectItem value="product">Ürün</SelectItem>
+                        <SelectItem value="productGroup">Ürün Grubu</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div class="space-y-1.5">
-                    <Label>{{ addKind === "brand" ? "Marka" : "Ürün" }}</Label>
+                    <Label>{{ addKind === "brand" ? "Marka" : "Ürün Grubu" }}</Label>
                     <CodeLookupField
                       v-if="addKind === 'brand'"
                       v-model="addBrand"
@@ -510,10 +511,10 @@ onBeforeUnmount(() => {
                     />
                     <CodeLookupField
                       v-else
-                      v-model="addProduct"
-                      :options="PRODUCTS"
-                      placeholder="Stok seçin"
-                      search-placeholder="Stok kodu veya ürün adı..."
+                      v-model="addProductGroup"
+                      :options="PRODUCT_GROUPS"
+                      placeholder="Ürün grubu seçin"
+                      search-placeholder="Grup kodu veya adı ara..."
                     />
                   </div>
                   <div class="flex gap-2">
@@ -687,13 +688,7 @@ onBeforeUnmount(() => {
               </CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
-              <SupplierBonusInput v-model="yearEndBonus" label="Sene Sonu Primi" id-prefix="p-yearend">
-                <span class="text-[12px] text-ink-muted">Dönem</span>
-                <Select :model-value="extra.bonusPeriods.yearEnd" @update:model-value="extra.bonusPeriods.yearEnd = String($event)">
-                  <SelectTrigger class="h-8 w-32" aria-label="Sene sonu primi dönemi"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem v-for="period in BONUS_PERIODS" :key="period.value" :value="period.value">{{ period.label }}</SelectItem></SelectContent>
-                </Select>
-              </SupplierBonusInput>
+              <SupplierBonusInput v-model="yearEndBonus" label="Sene Sonu Primi" id-prefix="p-yearend" :allow-tiers="false" />
               <SupplierBonusInput v-model="turnoverBonus" label="Ciro Primi" id-prefix="p-turnover">
                 <span class="text-[12px] text-ink-muted">Dönem</span>
                 <Select :model-value="extra.bonusPeriods.turnover" @update:model-value="extra.bonusPeriods.turnover = String($event)">
@@ -769,22 +764,28 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="space-y-1.5">
                     <Label>Barem</Label>
-                    <Select :model-value="rule.tiered ? 'tiered' : 'flat'" @update:model-value="rule.tiered = $event === 'tiered'; if (!rule.tiered) rule.minOrderAmount = null">
+                    <Select :model-value="rule.tiered ? 'tiered' : 'flat'" @update:model-value="rule.tiered = $event === 'tiered'; if (!rule.tiered) rule.minQuantity = null">
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="flat">Baremsiz</SelectItem><SelectItem value="tiered">Baremli</SelectItem></SelectContent>
                     </Select>
                   </div>
                   <div class="space-y-1.5">
-                    <Label :for="`freight-amount-${rule.id}`">Sipariş Tutarı (₺)</Label>
-                    <Input
-                      :id="`freight-amount-${rule.id}`"
-                      :model-value="rule.minOrderAmount ?? ''"
-                      class="text-right font-mono"
-                      inputmode="decimal"
-                      placeholder="₺"
-                      :disabled="!rule.tiered"
-                      @update:model-value="rule.minOrderAmount = numberOrNull($event)"
-                    />
+                    <Label :for="`freight-quantity-${rule.id}`">Miktar (en az)</Label>
+                    <div class="flex gap-2">
+                      <Input
+                        :id="`freight-quantity-${rule.id}`"
+                        :model-value="rule.minQuantity ?? ''"
+                        class="text-right font-mono"
+                        inputmode="decimal"
+                        placeholder="Adet"
+                        :disabled="!rule.tiered"
+                        @update:model-value="rule.minQuantity = numberOrNull($event)"
+                      />
+                      <Select v-model="rule.quantityUnit" :disabled="!rule.tiered">
+                        <SelectTrigger class="w-28" aria-label="Barem birimi"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem v-for="(label, key) in QUANTITY_UNIT_LABELS" :key="key" :value="key">{{ label }}</SelectItem></SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
                 <p v-if="showErrors && freightIssue(rule)" class="text-[12px] text-destructive">{{ freightIssue(rule) }}</p>
