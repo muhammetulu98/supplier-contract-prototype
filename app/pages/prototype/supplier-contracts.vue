@@ -4,7 +4,7 @@
 // Bir satıra girince /prototype/supplier-contract açılır ve o carinin sözleşmeleri gelir.
 import { ChevronDown, ChevronRight, Plus, RotateCw, Search } from "lucide-vue-next";
 import type { ErpSupplierContractListItem, ErpUncontractedSupplier } from "~/utils/supplierContractTypes";
-import { PROTO_UNCONTRACTED, protoListItems } from "~/utils/prototypeSupplierContracts";
+import { PROTO_UNCONTRACTED, protoListItems, resetSavedContracts } from "~/utils/prototypeSupplierContracts";
 import {
   DELIVERY_LABELS,
   bonusText,
@@ -43,6 +43,12 @@ const loadUncontracted = () => {};
 const refresh = () => {
   rows.value = protoListItems();
 };
+// Sunumdan önce: kaydedilen tüm değişiklikleri silip örnek veriye döner.
+const resetDemo = () => {
+  resetSavedContracts();
+  refresh();
+};
+onActivated(refresh);
 
 // ── Satırlar ──────────────────────────────────────────────────────────────────────────
 interface Row {
@@ -156,6 +162,7 @@ const COLUMNS = [
     <main class="mx-auto flex max-w-[1560px] flex-col gap-4 px-6 py-6">
     <PageHeader title="Tedarikçi Sözleşmeleri" description="Tedarikçilerle anlaşılan alış şartları, satış iskontosu, primler ve net karlılık.">
       <template #actions>
+        <Button variant="secondary" @click="resetDemo">Örnek veriye dön</Button>
         <Button variant="secondary" :disabled="loading" @click="refresh">
           <RotateCw class="mr-2 size-4" :class="loading ? 'animate-spin' : ''" />
           Yenile

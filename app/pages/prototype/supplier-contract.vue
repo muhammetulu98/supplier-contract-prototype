@@ -26,7 +26,14 @@ import {
   type SupplierContractTerms,
   type TermScope,
 } from "~/utils/supplierContractTerms";
-import { PROTO_SUPPLIERS, PROTO_UNCONTRACTED, newExtra, type Extra } from "~/utils/prototypeSupplierContracts";
+import {
+  PROTO_SUPPLIERS,
+  PROTO_UNCONTRACTED,
+  getSavedContracts,
+  newExtra,
+  saveContracts,
+  type Extra,
+} from "~/utils/prototypeSupplierContracts";
 import { TURKEY_PROVINCES, TURKEY_REGIONS } from "~/utils/turkeyRegions";
 
 definePageMeta({ layout: false, publicPage: true });
@@ -205,7 +212,29 @@ const fair = computed(() => FAIRS.find((item) => item.code === fairCode.value) ?
 //   • fuar yoksa → carinin genel sözleşmeleri,
 //   • fuar var ve ona ait kayıt varsa → o kayıt gelir,
 //   • fuar var ama kayıt yoksa → genel sözleşmenin şartları getirilir, farklı olanı düzeltilir.
+// Kaydedilen sözleşmeler tarayıcıda tutulur; cari veya fuar değişince örnek veriye değil, en son
+// kaydedilene (yoksa örnek veriye) dönülür. Kaydedilmemiş değişiklik de cari/fuar değişirken saklanır.
+const serialize = () => {
+  for (const contract of contracts.value) {
+    const scope = contract.terms.scopes[0]!;
+    scope.yearEndBonus = contract.yearEndBonus;
+    scope.turnoverBonus = contract.turnoverBonus;
+  }
+  return contracts.value.map((contract) => ({ terms: clone(contract.terms), extra: clone(contract.extra) }));
+};
+let loadedKey = "";
+let loadedSignature = "";
+const persist = () => {
+  const [code, fairCodeKey] = loadedKey.split("|") as [string, string];
+  if (!code || !contracts.value.length) return;
+  const data = serialize();
+  saveContracts(code, fairCodeKey ?? "", data);
+  loadedSignature = JSON.stringify(data);
+};
+const isDirty = () => !!loadedKey && contracts.value.length > 0 && JSON.stringify(serialize()) !== loadedSignature;
+
 watch([supplierCode, fairCode], () => {
+  if (isDirty()) persist();
   showErrors.value = false;
   savedAt.value = null;
   adding.value = false;
@@ -213,11 +242,12 @@ watch([supplierCode, fairCode], () => {
   if (!code) {
     contracts.value = [];
     activeId.value = null;
+    loadedKey = "";
     return;
   }
   const info = fair.value;
-  const general = EXISTING[code] ?? [];
-  const storedFair = info ? EXISTING_FAIR[`${code}|${info.code}`] : undefined;
+  const general = getSavedContracts(code, "") ?? EXISTING[code] ?? [];
+  const storedFair = info ? (getSavedContracts(code, info.code) ?? EXISTING_FAIR[`${code}|${info.code}`]) : undefined;
   const source = storedFair ?? general;
   const fromGeneral = !!info && !storedFair && general.length > 0;
   const withFair = (value: Extra): Extra => {
@@ -234,6 +264,8 @@ watch([supplierCode, fairCode], () => {
   if (!list.some((item) => item.terms.scopes[0]!.kind === "all")) list.unshift(makeContract(emptyTerms(), "new", withFair(newExtra())));
   contracts.value = list;
   activeId.value = list[0]!.id;
+  loadedKey = `${code}|${info?.code ?? ""}`;
+  loadedSignature = JSON.stringify(serialize());
 });
 
 // ── + Kapsam ekle ─────────────────────────────────────────────────────────────────────
@@ -335,8 +367,20 @@ const allIssues = computed(() => [
 const save = () => {
   showErrors.value = true;
   if (allIssues.value.length) return;
+  persist();
+  // Kaydedilen sözleşmeler artık "mevcut" sayılır; karşılaştırma noktası kaydedilen hâl olur.
+  for (const contract of contracts.value) {
+    contract.mode = "edit";
+    contract.fromGeneral = false;
+    contract.baseline = sections(contract.terms, contract.yearEndBonus, contract.turnoverBonus, contract.extra);
+  }
   savedAt.value = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 };
+
+// Sayfadan çıkarken (listeye dön, tarayıcı geri) kaydedilmemiş değişiklik kaybolmasın.
+onBeforeUnmount(() => {
+  if (isDirty()) persist();
+});
 </script>
 
 <template>
@@ -366,7 +410,7 @@ const save = () => {
         class="mb-4 rounded border border-tier-highest bg-paper px-4 py-3 text-[13px] text-ink"
         role="status"
       >
-        Prototip: {{ savedAt }} itibarıyla form geçerli — gerçek kayıt yapılmadı.
+        Kaydedildi ({{ savedAt }}). Prototipte kayıt yalnız bu tarayıcıda tutulur; cari ve fuar değiştirince bu şartlar geri gelir.
       </div>
 
       <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">

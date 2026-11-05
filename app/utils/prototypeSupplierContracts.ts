@@ -195,14 +195,44 @@ export const PROTO_UNCONTRACTED: ErpUncontractedSupplier[] = [
 
 const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
+// ── Kaydedilen sözleşmeler (yalnız bu tarayıcıda, localStorage) ───────────────────────
+// Anahtar: "cari|fuar" (fuarsız genel sözleşmeler için "cari|"). Böylece her fuarın ve her
+// kapsamın şartları birbirinden farklı kalır; sayfa değişince örnek veriye dönmez.
+const STORAGE_KEY = "supplier-contract-prototype:v1";
+type SavedMap = Record<string, ProtoContract[]>;
+const readSaved = (): SavedMap => {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as SavedMap;
+  } catch {
+    return {};
+  }
+};
+export const getSavedContracts = (supplier: string, fair: string): ProtoContract[] | undefined =>
+  readSaved()[`${supplier}|${fair}`];
+export const saveContracts = (supplier: string, fair: string, contracts: ProtoContract[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...readSaved(), [`${supplier}|${fair}`]: contracts }));
+  } catch {
+    // Tarayıcı depolamayı engelliyorsa kayıt bu oturumla sınırlı kalır.
+  }
+};
+export const resetSavedContracts = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // yok say
+  }
+};
+
 /**
  * Liste satırları: bir tedarikçinin tüm kapsam sözleşmeleri tek `terms` altında toplanır
  * (ilk sözleşmenin vade/nakliye şartlarıyla; kapsamlar sırayla).
  */
 export const protoListItems = (): ErpSupplierContractListItem[] =>
   PROTO_SUPPLIERS.map((supplier, index) => {
-    const terms = copy(supplier.contracts[0]!.terms);
-    terms.scopes = supplier.contracts.flatMap((contract) => copy(contract.terms.scopes));
+    const contracts = getSavedContracts(supplier.code, "") ?? supplier.contracts;
+    const terms = copy(contracts[0]!.terms);
+    terms.scopes = contracts.flatMap((contract) => copy(contract.terms.scopes));
     return {
       id: supplier.code,
       legacyId: index + 1,
