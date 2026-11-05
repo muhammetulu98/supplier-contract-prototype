@@ -5,6 +5,7 @@
 import { ChevronDown, ChevronRight, Plus, RotateCw, Search } from "lucide-vue-next";
 import type { ErpSupplierContractListItem, ErpUncontractedSupplier } from "~/utils/supplierContractTypes";
 import { PROTO_UNCONTRACTED, protoListItems, resetSavedContracts } from "~/utils/prototypeSupplierContracts";
+import { resetHistory } from "~/utils/contractHistory";
 import {
   DELIVERY_LABELS,
   bonusText,
@@ -46,6 +47,7 @@ const refresh = () => {
 // Sunumdan önce: kaydedilen tüm değişiklikleri silip örnek veriye döner.
 const resetDemo = () => {
   resetSavedContracts();
+  resetHistory();
   refresh();
 };
 onActivated(refresh);

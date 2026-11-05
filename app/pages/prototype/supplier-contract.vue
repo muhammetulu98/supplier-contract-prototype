@@ -3,7 +3,7 @@
 // Gerçek ekrandan farkları: "Ek Koşullar" (koşul metinleri, ciro primi dilimleri, pazarlama
 // destekleri) ve "Genel Primler" kaldırıldı; "Kapsam ve Şartlar" kartı en üste alındı.
 // Kaydet hiçbir şey göndermez. Hesap: ~/utils/supplierContractTerms (gerçek ekranla aynı).
-import { Plus, Trash2 } from "lucide-vue-next";
+import { History, Plus, Trash2 } from "lucide-vue-next";
 import type { CodeLookupOption } from "~/components/CodeLookupField.vue";
 import {
   DELIVERY_LABELS,
@@ -35,6 +35,14 @@ import {
   saveContracts,
   type Extra,
 } from "~/utils/prototypeSupplierContracts";
+import {
+  PROTOTYPE_USER,
+  addHistory,
+  contractFields,
+  diffFields,
+  getHistory,
+  type HistoryEntry,
+} from "~/utils/contractHistory";
 import { TURKEY_PROVINCES, TURKEY_REGIONS } from "~/utils/turkeyRegions";
 
 definePageMeta({ layout: false, publicPage: true });
@@ -88,6 +96,11 @@ const fairCode = ref("");
 const contractDate = ref(today);
 const showErrors = ref(false);
 const savedAt = ref<string | null>(null);
+const history = ref<HistoryEntry[]>([]);
+const reloadHistory = () => {
+  const [code, fairKey] = loadedKey.split("|");
+  history.value = code ? getHistory(code, fairKey ?? "") : [];
+};
 
 // ── Kapsam = sözleşme ─────────────────────────────────────────────────────────────────
 // Her kapsam (tüm ürünler / marka / ürün) AYRI bir sözleşmedir; Fiyat Yönetimi'nde de ayrı bir
@@ -152,6 +165,8 @@ interface Contract {
   fromGeneral?: boolean;
   /** Karşılaştırma noktası: mevcut sözleşmede kendisi, kopyada kaynağı; yeni boş sözleşmede yok. */
   baseline: Sections | null;
+  /** Geçmiş kaydı için alan alan karşılaştırma noktası (baseline ile aynı anlarda güncellenir). */
+  snapshot: Record<string, string> | null;
 }
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -167,6 +182,7 @@ const makeContract = (terms: SupplierContractTerms, mode: Contract["mode"], extr
     extra,
     mode,
     baseline: mode === "new" ? null : sections(terms, scope.yearEndBonus, scope.turnoverBonus, extra),
+    snapshot: mode === "edit" ? contractFields(terms, scope.yearEndBonus, scope.turnoverBonus, extra) : null,
   };
   return contract;
 };
@@ -244,6 +260,7 @@ watch([supplierCode, fairCode], () => {
     contracts.value = [];
     activeId.value = null;
     loadedKey = "";
+    history.value = [];
     return;
   }
   const info = fair.value;
@@ -267,6 +284,7 @@ watch([supplierCode, fairCode], () => {
   activeId.value = list[0]!.id;
   loadedKey = `${code}|${info?.code ?? ""}`;
   loadedSignature = JSON.stringify(serialize());
+  reloadHistory();
 });
 
 // ── + Kapsam ekle ─────────────────────────────────────────────────────────────────────
@@ -348,6 +366,9 @@ const addRegion = (rule: FreightRule, region: string) => {
   for (const province of TURKEY_REGIONS[region] ?? []) if (free.includes(province)) rule.provinces.push(province);
 };
 
+const formatHistoryDate = (iso: string) =>
+  new Date(iso).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
 const numberOrNull = (value: string | number | null | undefined) => parseDecimal(value);
 
 // ── Kaydet (sahte) ────────────────────────────────────────────────────────────────────
@@ -369,6 +390,21 @@ const save = () => {
   showErrors.value = true;
   if (allIssues.value.length) return;
   persist();
+  // Geçmiş: kapsam başına, kaydedilen hâlle önceki hâl arasındaki farklar.
+  const entries: Omit<HistoryEntry, "id">[] = [];
+  const [historyCode, historyFair] = loadedKey.split("|") as [string, string];
+  const stamp = new Date().toISOString();
+  for (const contract of contracts.value) {
+    const after = contractFields(contract.terms, contract.yearEndBonus, contract.turnoverBonus, contract.extra);
+    const created = !contract.snapshot;
+    const changes = contract.snapshot ? diffFields(contract.snapshot, after) : [];
+    if (created || changes.length) {
+      entries.push({ at: stamp, user: PROTOTYPE_USER, scope: labelOf(contract.terms.scopes[0]!), created, changes });
+    }
+    contract.snapshot = after;
+  }
+  addHistory(historyCode, historyFair ?? "", entries);
+  reloadHistory();
   // Kaydedilen sözleşmeler artık "mevcut" sayılır; karşılaştırma noktası kaydedilen hâl olur.
   for (const contract of contracts.value) {
     contract.mode = "edit";
@@ -394,6 +430,30 @@ onBeforeUnmount(() => {
     <main class="mx-auto max-w-[1280px] px-6 py-6">
       <PageHeader :title="supplierCode ? 'Tedarikçi Sözleşmesi' : 'Yeni Tedarikçi Sözleşmesi'" description="Her kapsam ayrı bir sözleşmedir. Yeni kapsamı + ile ekleyin; genel şartlar gelir, yalnız farklı olanı düzeltin. Marka veya ürün kapsamı eklenince genel sözleşme yalnız kalan ürünleri kapsar.">
         <template #actions>
+          <Popover v-if="supplierCode">
+            <PopoverTrigger as-child>
+              <Button variant="secondary" type="button"><History class="size-3.5" />Son değişiklik</Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" class="w-[420px] max-w-[92vw] p-0">
+              <div class="border-b border-tier-highest px-4 py-3 text-[13px] font-medium text-ink">Değişiklik geçmişi</div>
+              <p v-if="!history.length" class="px-4 py-4 text-[12px] text-ink-muted">Bu sözleşme için kaydedilmiş değişiklik yok. Kaydet'e basılınca burada görünür.</p>
+              <ol v-else class="max-h-[420px] divide-y divide-tier-highest/60 overflow-y-auto">
+                <li v-for="(entry, index) in history" :key="entry.id" class="space-y-1.5 px-4 py-3 text-[12px]">
+                  <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span class="font-medium text-ink">{{ entry.user }}<span v-if="index === 0" class="ml-1.5 rounded bg-tier px-1.5 py-0.5 text-[11px] font-normal text-ink-muted">en son</span></span>
+                    <span class="font-mono tabular-nums text-ink-muted">{{ formatHistoryDate(entry.at) }}</span>
+                  </div>
+                  <div class="text-ink-muted">{{ entry.scope }}</div>
+                  <p v-if="entry.created" class="text-ink">Sözleşme oluşturuldu.</p>
+                  <ul v-else class="space-y-0.5">
+                    <li v-for="change in entry.changes" :key="change.field" class="text-ink">
+                      <span class="text-ink-muted">{{ change.field }}:</span> {{ change.from }} → <strong class="font-medium">{{ change.to }}</strong>
+                    </li>
+                  </ul>
+                </li>
+              </ol>
+            </PopoverContent>
+          </Popover>
           <Button variant="secondary" type="button" @click="router.push('/prototype/supplier-contracts')">Liste</Button>
           <Button type="button" @click="save">Kaydet</Button>
         </template>
